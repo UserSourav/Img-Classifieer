@@ -7,18 +7,623 @@
   <meta name="description" content="Classify any image instantly using MobileNet AI — runs entirely in your browser, no uploads, fully private." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital@0;1&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0b0b0f;
+      --bg2: #12121a;
+      --bg3: #1a1a26;
+      --border: rgba(255,255,255,0.08);
+      --border-hover: rgba(255,255,255,0.18);
+      --accent: #c8ff00;
+      --accent2: #7c5cfc;
+      --text: #f0ede8;
+      --muted: #7a7885;
+      --muted2: #4a4858;
+      --card-radius: 16px;
+      --font-display: 'Syne', sans-serif;
+      --font-mono: 'DM Mono', monospace;
+    }
+
+    html { font-size: 16px; scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-mono);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* ── background effects ── */
+    .noise {
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.6;
+    }
+
+    /* Grid lines */
+    .bg-grid {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(200,255,0,0.018) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(200,255,0,0.018) 1px, transparent 1px);
+      background-size: 72px 72px;
+      mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 30%, transparent 100%);
+    }
+
+    /* Ambient orbs */
+    .bg-orb {
+      position: fixed;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 0;
+      filter: blur(100px);
+    }
+    .bg-orb-1 {
+      width: 600px; height: 600px;
+      top: -200px; right: -150px;
+      background: radial-gradient(circle, rgba(200,255,0,0.07) 0%, transparent 70%);
+    }
+    .bg-orb-2 {
+      width: 500px; height: 500px;
+      bottom: 5%; left: -150px;
+      background: radial-gradient(circle, rgba(124,92,252,0.06) 0%, transparent 70%);
+    }
+    .bg-orb-3 {
+      width: 350px; height: 350px;
+      top: 40%; right: 5%;
+      background: radial-gradient(circle, rgba(200,255,0,0.03) 0%, transparent 70%);
+    }
+
+    /* ── HEADER ── */
+    header {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.25rem 2.5rem;
+      border-bottom: 1px solid var(--border);
+      gap: 1rem;
+      backdrop-filter: blur(12px);
+      background: rgba(11,11,15,0.6);
+    }
+
+    .logo { display: flex; align-items: center; }
+
+    .logo-text {
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 1.1rem;
+      letter-spacing: -0.02em;
+      color: var(--text);
+    }
+
+    .header-nav {
+      display: flex;
+      align-items: center;
+      gap: 1.75rem;
+      margin: 0 auto;
+    }
+
+    .header-nav a {
+      font-size: 0.78rem;
+      color: var(--muted);
+      text-decoration: none;
+      letter-spacing: 0.04em;
+      transition: color 0.2s;
+    }
+
+    .header-nav a:hover { color: var(--text); }
+
+    .model-badge {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.72rem;
+      color: var(--muted);
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      padding: 0.4rem 0.9rem;
+      border-radius: 999px;
+      white-space: nowrap;
+      transition: color 0.3s, border-color 0.3s;
+      flex-shrink: 0;
+    }
+
+    .model-badge.ready { color: var(--accent); border-color: rgba(200,255,0,0.25); }
+    .model-badge.error { color: #ff6b6b; }
+
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted2); flex-shrink: 0; }
+    .dot.loading { animation: pulse-dot 1.4s infinite; }
+    .dot.ready { background: var(--accent); box-shadow: 0 0 8px rgba(200,255,0,0.5); }
+    .dot.error { background: #ff6b6b; }
+
+    @keyframes pulse-dot { 0%,100%{opacity:.4} 50%{opacity:1} }
+
+    /* ── MAIN ── */
+    main {
+      position: relative;
+      z-index: 1;
+      flex: 1;
+      max-width: 860px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 4rem 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 5rem;
+    }
+
+    /* ── HERO ── */
+    .hero-label {
+      display: inline-block;
+      font-size: 0.65rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--accent);
+      border: 1px solid rgba(200,255,0,0.3);
+      padding: 0.3rem 0.8rem;
+      border-radius: 999px;
+      margin-bottom: 1.5rem;
+    }
+
+    .hero h1 {
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: clamp(2.6rem, 6vw, 4.2rem);
+      line-height: 1.05;
+      letter-spacing: -0.03em;
+      color: var(--text);
+      margin-bottom: 1.25rem;
+    }
+
+    .hero h1 em { font-style: italic; color: var(--accent); }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 0.85rem;
+      line-height: 1.8;
+      max-width: 520px;
+      margin-bottom: 2.5rem;
+    }
+
+    .hero-stats {
+      display: flex;
+      align-items: center;
+      gap: 2rem;
+      padding: 1.25rem 1.5rem;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      width: fit-content;
+    }
+
+    .stat { display: flex; flex-direction: column; gap: 0.25rem; }
+    .stat-num { font-family: var(--font-display); font-weight: 700; font-size: 1.3rem; color: var(--accent); letter-spacing: -0.02em; }
+    .stat-label { font-size: 0.65rem; color: var(--muted2); letter-spacing: 0.04em; }
+    .stat-divider { width: 1px; height: 36px; background: var(--border); }
+
+    /* ── SECTION LABELS ── */
+    .section-label {
+      font-size: 0.63rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 0.75rem;
+    }
+
+    /* ── DROP ZONE ── */
+    .drop-zone {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--card-radius);
+      min-height: 300px;
+      transition: border-color 0.2s, background 0.2s;
+      overflow: hidden;
+      margin-top: 1rem;
+    }
+
+    .drop-zone.drag-over {
+      border-color: var(--accent);
+      background: rgba(200,255,0,0.03);
+    }
+
+    .drop-inner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 3.5rem 2rem;
+      gap: 0.65rem;
+      min-height: 300px;
+    }
+
+    .drop-icon-svg { color: var(--muted2); margin-bottom: 0.5rem; animation: float 3s ease-in-out infinite; }
+
+    @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+
+    .drop-text { font-family: var(--font-display); font-weight: 600; font-size: 1.1rem; color: var(--text); }
+    .drop-sub { font-size: 0.73rem; color: var(--muted2); }
+    .formats { letter-spacing: 0.05em; }
+
+    .btn-upload {
+      display: inline-block;
+      padding: 0.55rem 1.5rem;
+      background: var(--accent);
+      color: #0b0b0f;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      font-weight: 500;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+      margin: 0.3rem 0;
+    }
+
+    .btn-upload:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(200,255,0,0.3); }
+
+    /* ── PREVIEW ── */
+    .preview-state { display: flex; gap: 0; min-height: 340px; }
+    .preview-state.hidden { display: none !important; }
+    .drop-inner.hidden { display: none !important; }
+    .hidden { display: none !important; }
+
+    .image-frame {
+      flex: 1;
+      position: relative;
+      background: #000;
+      min-height: 300px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-right: 1px solid var(--border);
+    }
+
+    .image-frame img { width: 100%; height: 100%; object-fit: contain; max-height: 400px; display: block; }
+
+    .btn-reset {
+      position: absolute;
+      top: 0.75rem; right: 0.75rem;
+      width: 28px; height: 28px;
+      background: rgba(0,0,0,0.7);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 0.7rem;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .btn-reset:hover { background: rgba(255,80,80,0.2); color: #ff6b6b; }
+
+    .results-panel {
+      width: 280px;
+      flex-shrink: 0;
+      padding: 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .thinking { display: flex; flex-direction: column; align-items: center; gap: 1rem; color: var(--muted); font-size: 0.8rem; }
+
+    .spinner {
+      width: 28px; height: 28px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .results { width: 100%; }
+
+    .results-label {
+      font-size: 0.63rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted2);
+      margin-bottom: 1rem;
+    }
+
+    .predictions { list-style: none; display: flex; flex-direction: column; gap: 0.85rem; }
+
+    .prediction-item { display: flex; flex-direction: column; gap: 0.3rem; animation: slide-in 0.35s ease both; }
+    .prediction-item:nth-child(1) { animation-delay: 0s; }
+    .prediction-item:nth-child(2) { animation-delay: 0.07s; }
+    .prediction-item:nth-child(3) { animation-delay: 0.14s; }
+    .prediction-item:nth-child(4) { animation-delay: 0.21s; }
+    .prediction-item:nth-child(5) { animation-delay: 0.28s; }
+
+    @keyframes slide-in { from{opacity:0;transform:translateX(8px)} to{opacity:1;transform:translateX(0)} }
+
+    .pred-header { display: flex; justify-content: space-between; align-items: baseline; }
+
+    .pred-label {
+      font-size: 0.76rem;
+      color: var(--text);
+      text-transform: capitalize;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 155px;
+    }
+
+    .pred-pct { font-size: 0.7rem; font-weight: 600; color: var(--accent); }
+    .pred-bar-track { height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
+
+    .pred-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent2), var(--accent));
+      border-radius: 2px;
+      transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+      width: 0;
+    }
+
+    .pred-bar.top { background: var(--accent); }
+
+    .meta {
+      margin-top: 1.25rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.63rem;
+      color: var(--muted2);
+      line-height: 1.9;
+    }
+
+    .btn-try-another {
+      margin-top: 1.25rem;
+      width: 100%;
+      padding: 0.5rem;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+    }
+
+    .btn-try-another:hover { border-color: var(--border-hover); color: var(--text); }
+
+    /* ── SAMPLES ── */
+    .samples { margin-top: 1.5rem; }
+
+    .samples-label {
+      font-size: 0.63rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted2);
+      margin-bottom: 0.85rem;
+    }
+
+    .sample-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.6rem; }
+
+    .sample-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.85rem 0.5rem;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      cursor: pointer;
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      transition: border-color 0.2s, background 0.2s, color 0.2s, transform 0.15s;
+    }
+
+    .sample-btn:hover { border-color: var(--border-hover); background: var(--bg3); color: var(--text); transform: translateY(-2px); }
+    .sample-btn:active { transform: translateY(0); }
+    .sample-btn svg { opacity: 0.6; transition: opacity 0.2s; }
+    .sample-btn:hover svg { opacity: 1; }
+
+    /* ── INFO SECTIONS ── */
+    .info-section h2 {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: clamp(1.5rem, 3vw, 2rem);
+      letter-spacing: -0.02em;
+      color: var(--text);
+      margin-bottom: 0.85rem;
+    }
+
+    .section-desc {
+      color: var(--muted);
+      font-size: 0.83rem;
+      line-height: 1.8;
+      max-width: 520px;
+      margin-bottom: 2rem;
+    }
+
+    /* ── STEPS ── */
+    .steps-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+
+    .step-card {
+      background: var(--bg2);
+      padding: 1.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      transition: background 0.2s;
+    }
+
+    .step-card:hover { background: var(--bg3); }
+
+    .step-num {
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 2rem;
+      color: var(--muted2);
+      letter-spacing: -0.04em;
+      line-height: 1;
+      margin-bottom: 0.25rem;
+    }
+
+    .step-card h3 { font-family: var(--font-display); font-weight: 600; font-size: 0.95rem; color: var(--text); }
+    .step-card p { font-size: 0.78rem; color: var(--muted); line-height: 1.7; }
+
+    /* ── SPECS ── */
+    .specs-grid {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      margin-top: 1.25rem;
+    }
+
+    .spec-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.85rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      gap: 1rem;
+      transition: background 0.15s;
+    }
+
+    .spec-row:last-child { border-bottom: none; }
+    .spec-row:hover { background: var(--bg3); }
+    .spec-key { font-size: 0.75rem; color: var(--muted); flex-shrink: 0; }
+    .spec-val { font-size: 0.75rem; color: var(--text); text-align: right; }
+
+    /* ── FAQ ── */
+    .faq-list { display: flex; flex-direction: column; gap: 0; margin-top: 1.25rem; border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+
+    .faq-item {
+      border-bottom: 1px solid var(--border);
+      background: var(--bg2);
+      transition: background 0.15s;
+    }
+
+    .faq-item:last-child { border-bottom: none; }
+    .faq-item[open] { background: var(--bg3); }
+
+    .faq-item summary {
+      padding: 1.1rem 1.5rem;
+      font-size: 0.82rem;
+      color: var(--text);
+      cursor: pointer;
+      list-style: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      user-select: none;
+    }
+
+    .faq-item summary::-webkit-details-marker { display: none; }
+
+    .faq-item summary::after {
+      content: '+';
+      font-size: 1.1rem;
+      color: var(--muted2);
+      transition: transform 0.2s;
+      flex-shrink: 0;
+    }
+
+    .faq-item[open] summary::after { transform: rotate(45deg); color: var(--accent); }
+    .faq-item p { padding: 0 1.5rem 1.25rem; font-size: 0.78rem; color: var(--muted); line-height: 1.8; }
+
+    /* ── FOOTER ── */
+    footer {
+      position: relative;
+      z-index: 1;
+      border-top: 1px solid var(--border);
+      padding: 2rem 2.5rem;
+    }
+
+    .footer-inner {
+      max-width: 860px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 2rem;
+      flex-wrap: wrap;
+    }
+
+    .footer-brand { display: flex; flex-direction: column; gap: 0.25rem; }
+    .footer-tagline { font-size: 0.68rem; color: var(--muted2); margin-bottom: 0.75rem; }
+
+    .footer-links { display: flex; align-items: center; gap: 0.6rem; font-size: 0.68rem; color: var(--muted2); flex-wrap: wrap; }
+    .sep { color: var(--muted2); opacity: 0.4; }
+
+    /* ── subtle contact block ── */
+    .footer-contact {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    .contact-row {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      text-decoration: none;
+      color: var(--muted2);
+      font-size: 0.68rem;
+      letter-spacing: 0.02em;
+      transition: color 0.2s;
+    }
+
+    .contact-row:hover { color: var(--muted); }
+
+    .contact-icon {
+      width: 22px; height: 22px;
+      display: flex; align-items: center; justify-content: center;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      flex-shrink: 0;
+      color: var(--muted2);
+      transition: border-color 0.2s, color 0.2s;
+    }
+
+    .contact-row:hover .contact-icon {
+      border-color: rgba(200,255,0,0.2);
+      color: var(--accent);
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 680px) {
+      header { padding: 1rem 1.25rem; }
+      .header-nav { display: none; }
+      main { padding: 2.5rem 1.25rem; gap: 3.5rem; }
+      .hero-stats { flex-direction: column; gap: 1rem; width: 100%; }
+      .stat-divider { width: 100%; height: 1px; }
+      .preview-state { flex-direction: column; }
+      .results-panel { width: 100%; border-top: 1px solid var(--border); }
+      .sample-grid { grid-template-columns: repeat(3, 1fr); }
+      .steps-grid { grid-template-columns: 1fr; }
+      .footer-inner { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
 </head>
 <body>
+  <!-- bg effects -->
+  <div class="bg-grid"></div>
+  <div class="bg-orb bg-orb-1"></div>
+  <div class="bg-orb bg-orb-2"></div>
+  <div class="bg-orb bg-orb-3"></div>
   <div class="noise"></div>
 
   <header>
     <div class="logo">
-      <svg class="logo-mark" width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect x="1" y="1" width="26" height="26" rx="6" stroke="#c8ff00" stroke-width="1.5"/>
-        <path d="M7 8 L14 20 L21 8" stroke="#c8ff00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-        <circle cx="14" cy="14" r="2.5" fill="#c8ff00"/>
-      </svg>
       <span class="logo-text">V-Image</span>
     </div>
     <nav class="header-nav">
@@ -35,7 +640,7 @@
   <main>
 
     <section class="hero" id="top">
-      <div class="hero-label">Browser-native </div>
+      <div class="hero-label">Browser-native</div>
       <h1>What does the<br /><em>machine</em> see?</h1>
       <p class="subtitle">
         Drop any image and V-Image classifies it in milliseconds using MobileNet v3 &mdash;
@@ -120,14 +725,14 @@
             <span>Fruit</span>
           </button>
           <button class="sample-btn" data-url="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e2/Southern_right_whale.jpg/500px-Southern_right_whale.jpg">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M2 16c0-5 3.5-9 8-9s8 3 10 5c0 0-2 1-3 1s-2-1-3-1"/>
-  <path d="M2 16c1 2 3 3 5 3h7c2 0 4-1 5-3"/>
-  <path d="M17 16c0 0 1 3-1 5"/>
-  <path d="M14 16c0 0 0 3-2 5"/>
-  <path d="M6 10c-1-1-3-1-4 0"/>
-  <circle cx="8" cy="12" r="0.75" fill="currentColor" stroke="none"/>
-</svg>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M2 16c0-5 3.5-9 8-9s8 3 10 5c0 0-2 1-3 1s-2-1-3-1"/>
+              <path d="M2 16c1 2 3 3 5 3h7c2 0 4-1 5-3"/>
+              <path d="M17 16c0 0 1 3-1 5"/>
+              <path d="M14 16c0 0 0 3-2 5"/>
+              <path d="M6 10c-1-1-3-1-4 0"/>
+              <circle cx="8" cy="12" r="0.75" fill="currentColor" stroke="none"/>
+            </svg>
             <span>Whale</span>
           </button>
         </div>
@@ -150,7 +755,7 @@
         <div class="step-card">
           <div class="step-num">02</div>
           <h3>Image is pre-processed</h3>
-          <p>Your image is resized to 224x224 pixels and normalized into a float tensor. Nothing is sent to any server.</p>
+          <p>Your image is resized to 224×224 pixels and normalized into a float tensor. Nothing is sent to any server.</p>
         </div>
         <div class="step-card">
           <div class="step-num">03</div>
@@ -171,7 +776,7 @@
       <div class="specs-grid">
         <div class="spec-row"><span class="spec-key">Model</span><span class="spec-val">MobileNet v3 Large (ImageNet)</span></div>
         <div class="spec-row"><span class="spec-key">Framework</span><span class="spec-val">TensorFlow.js 4.17 + WebGL backend</span></div>
-        <div class="spec-row"><span class="spec-key">Input size</span><span class="spec-val">224 x 224 pixels (auto-resized)</span></div>
+        <div class="spec-row"><span class="spec-key">Input size</span><span class="spec-val">224 × 224 pixels (auto-resized)</span></div>
         <div class="spec-row"><span class="spec-key">Output classes</span><span class="spec-val">1,000 ImageNet categories</span></div>
         <div class="spec-row"><span class="spec-key">Inference time</span><span class="spec-val">50 to 300 ms depending on device GPU</span></div>
         <div class="spec-row"><span class="spec-key">Model size</span><span class="spec-val">~16 MB (cached after first load)</span></div>
@@ -206,7 +811,6 @@
           <summary>Can I use this on mobile?</summary>
           <p>Yes. V-Image is fully responsive. On mobile, tap "Browse files" to select from your photo library or camera roll. Inference may be slightly slower on older devices due to limited GPU capability.</p>
         </details>
-        
       </div>
     </section>
 
@@ -217,15 +821,43 @@
       <div class="footer-brand">
         <span class="logo-text" style="font-size:0.95rem;">V-Image</span>
         <span class="footer-tagline">On-device image classification</span>
+        <div class="footer-links">
+          <span>Built with TensorFlow.js</span>
+          <span class="sep">&middot;</span>
+          <span>MobileNet v3</span>
+          <span class="sep">&middot;</span>
+          <span>No cookies</span>
+          <span class="sep">&middot;</span>
+          <span>No tracking</span>
+        </div>
       </div>
-      <div class="footer-links">
-        <span>Built with TensorFlow.js</span>
-        <span class="sep">&middot;</span>
-        <span>MobileNet v3</span>
-        <span class="sep">&middot;</span>
-        <span>No cookies</span>
-        <span class="sep">&middot;</span>
-        <span>No tracking</span>
+
+      <!-- subtle contact info -->
+      <div class="footer-contact">
+        <a class="contact-row" href="mailto:ss6015@srmist.edu.in">
+          <span class="contact-icon">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+            </svg>
+          </span>
+          ss6015@srmist.edu.in
+        </a>
+        <a class="contact-row" href="https://linkedin.com/in/usersourav" target="_blank" rel="noopener">
+          <span class="contact-icon">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/>
+            </svg>
+          </span>
+          linkedin.com/in/usersourav
+        </a>
+        <a class="contact-row" href="https://github.com/Usersourav" target="_blank" rel="noopener">
+          <span class="contact-icon">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/>
+            </svg>
+          </span>
+          github.com/Usersourav
+        </a>
       </div>
     </div>
   </footer>
