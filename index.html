@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>VisionAI — Image Classifier</title>
+  <title>V-Image — Browser Image Classifier</title>
+  <meta name="description" content="Classify any image instantly using MobileNet AI — runs entirely in your browser, no uploads, fully private." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital@0;1&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/style.css" />
@@ -13,79 +14,220 @@
 
   <header>
     <div class="logo">
-      <span class="logo-icon">◈</span>
-      <span class="logo-text">VisionAI</span>
+      <svg class="logo-mark" width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="1" y="1" width="26" height="26" rx="6" stroke="#c8ff00" stroke-width="1.5"/>
+        <path d="M7 8 L14 20 L21 8" stroke="#c8ff00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <circle cx="14" cy="14" r="2.5" fill="#c8ff00"/>
+      </svg>
+      <span class="logo-text">V-Image</span>
     </div>
+    <nav class="header-nav">
+      <a href="#classifier">Classify</a>
+      <a href="#how-it-works">How it works</a>
+      <a href="#faq">FAQ</a>
+    </nav>
     <div class="model-badge" id="modelBadge">
       <span class="dot loading"></span>
-      <span id="modelStatus">Loading model…</span>
+      <span id="modelStatus">Loading model&hellip;</span>
     </div>
   </header>
 
   <main>
-    <section class="hero">
+
+    <section class="hero" id="top">
+      <div class="hero-label">Browser-native AI</div>
       <h1>What does the<br /><em>machine</em> see?</h1>
-      <p class="subtitle">Drop any image. MobileNet classifies it instantly — no server, no upload, fully private.</p>
-    </section>
-
-    <section class="drop-zone" id="dropZone">
-      <div class="drop-inner" id="dropInner">
-        <div class="drop-icon">⬡</div>
-        <p class="drop-text">Drop an image here</p>
-        <span class="drop-sub">or</span>
-        <label class="btn-upload" for="fileInput">Browse files</label>
-        <input type="file" id="fileInput" accept="image/*" hidden />
-        <span class="drop-sub formats">PNG · JPG · WEBP · GIF</span>
-      </div>
-
-      <div class="preview-state hidden" id="previewState">
-        <div class="image-frame">
-          <img id="previewImg" src="" alt="Preview" />
-          <button class="btn-reset" id="resetBtn" title="Clear image">✕</button>
+      <p class="subtitle">
+        Drop any image and V-Image classifies it in milliseconds using MobileNet v3 &mdash;
+        a state-of-the-art neural network running entirely inside your browser.
+        No server. No upload. No account. Just results.
+      </p>
+      <div class="hero-stats">
+        <div class="stat">
+          <span class="stat-num">1,000</span>
+          <span class="stat-label">Object classes</span>
         </div>
-        <div class="results-panel" id="resultsPanel">
-          <div class="thinking" id="thinking">
-            <span class="spinner"></span>
-            <span>Analyzing…</span>
-          </div>
-          <div class="results hidden" id="results">
-            <p class="results-label">Top predictions</p>
-            <ul class="predictions" id="predictions"></ul>
-            <div class="meta" id="meta"></div>
-          </div>
+        <div class="stat-divider"></div>
+        <div class="stat">
+          <span class="stat-num">&lt; 300ms</span>
+          <span class="stat-label">Inference time</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat">
+          <span class="stat-num">100%</span>
+          <span class="stat-label">Private &mdash; on-device</span>
         </div>
       </div>
     </section>
 
-    <section class="samples">
-      <p class="samples-label">Try a sample</p>
-      <div class="sample-grid" id="sampleGrid">
-        <button class="sample-btn" data-url="https://upload.wikimedia.org/wikipedia/commons/thumb/4/43/Cute_dog.jpg/320px-Cute_dog.jpg" data-label="Dog">
-          <span class="sample-emoji">🐕</span><span>Dog</span>
-        </button>
-        <button class="sample-btn" data-url="https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/Persian_cat_%28kitten%29.jpg/320px-Persian_cat_%28kitten%29.jpg" data-label="Cat">
-          <span class="sample-emoji">🐈</span><span>Cat</span>
-        </button>
-        <button class="sample-btn" data-url="https://upload.wikimedia.org/wikipedia/commons/thumb/3/37/African_Bush_Elephant.jpg/320px-African_Bush_Elephant.jpg" data-label="Elephant">
-          <span class="sample-emoji">🐘</span><span>Elephant</span>
-        </button>
-        <button class="sample-btn" data-url="https://upload.wikimedia.org/wikipedia/commons/thumb/4/45/A_small_cup_of_coffee.JPG/320px-A_small_cup_of_coffee.JPG" data-label="Coffee">
-          <span class="sample-emoji">☕</span><span>Coffee</span>
-        </button>
-        <button class="sample-btn" data-url="https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Gatto_europeo4.jpg/320px-Gatto_europeo4.jpg" data-label="Tabby Cat">
-          <span class="sample-emoji">🐱</span><span>Tabby</span>
-        </button>
-        <button class="sample-btn" data-url="https://upload.wikimedia.org/wikipedia/commons/thumb/9/90/Hapus_Mango.jpg/320px-Hapus_Mango.jpg" data-label="Mango">
-          <span class="sample-emoji">🥭</span><span>Mango</span>
-        </button>
+    <section id="classifier">
+      <div class="section-label">Image Classifier</div>
+
+      <div class="drop-zone" id="dropZone">
+        <div class="drop-inner" id="dropInner">
+          <svg class="drop-icon-svg" width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="4" y="4" width="40" height="40" rx="10" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3"/>
+            <path d="M24 16 L24 32 M16 24 L24 16 L32 24" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <p class="drop-text">Drag an image here</p>
+          <span class="drop-sub">or paste from clipboard (Ctrl+V)</span>
+          <label class="btn-upload" for="fileInput">Browse files</label>
+          <input type="file" id="fileInput" accept="image/*" hidden />
+          <span class="drop-sub formats">PNG &middot; JPG &middot; WEBP &middot; GIF &middot; BMP</span>
+        </div>
+
+        <div class="preview-state hidden" id="previewState">
+          <div class="image-frame">
+            <img id="previewImg" src="" alt="Preview" />
+            <button class="btn-reset" id="resetBtn" title="Clear image">&#x2715;</button>
+          </div>
+          <div class="results-panel" id="resultsPanel">
+            <div class="thinking" id="thinking">
+              <span class="spinner"></span>
+              <span>Analyzing image&hellip;</span>
+            </div>
+            <div class="results hidden" id="results">
+              <p class="results-label">Top predictions</p>
+              <ul class="predictions" id="predictions"></ul>
+              <div class="meta" id="meta"></div>
+              <button class="btn-try-another" id="tryAnother">Classify another image</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="samples">
+        <p class="samples-label">Try a sample image</p>
+        <div class="sample-grid" id="sampleGrid">
+          <button class="sample-btn" data-url="https://upload.wikimedia.org/wikipedia/commons/thumb/4/43/Cute_dog.jpg/320px-Cute_dog.jpg">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 9h.01M16 9h.01M9 16c.85.63 1.885 1 3 1s2.15-.37 3-1"/></svg>
+            <span>Dog</span>
+          </button>
+          <button class="sample-btn" data-url="https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/Persian_cat_%28kitten%29.jpg/320px-Persian_cat_%28kitten%29.jpg">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 9h.01M16 9h.01M9 15c.85.63 1.885 1 3 1s2.15-.37 3-1"/></svg>
+            <span>Cat</span>
+          </button>
+          <button class="sample-btn" data-url="https://upload.wikimedia.org/wikipedia/commons/thumb/3/37/African_Bush_Elephant.jpg/320px-African_Bush_Elephant.jpg">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="10" rx="4"/><path d="M7 8V6a2 2 0 0 1 4 0v2M13 8V5a2 2 0 0 1 4 0v3"/></svg>
+            <span>Elephant</span>
+          </button>
+          <button class="sample-btn" data-url="https://upload.wikimedia.org/wikipedia/commons/thumb/4/45/A_small_cup_of_coffee.JPG/320px-A_small_cup_of_coffee.JPG">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 8h1a4 4 0 0 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><line x1="6" x2="6" y1="2" y2="4"/><line x1="10" x2="10" y1="2" y2="4"/></svg>
+            <span>Coffee</span>
+          </button>
+          <button class="sample-btn" data-url="https://upload.wikimedia.org/wikipedia/commons/thumb/9/90/Hapus_Mango.jpg/320px-Hapus_Mango.jpg">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="7"/><path d="M12 6V2M12 2c0 0 2-1 4 1"/></svg>
+            <span>Fruit</span>
+          </button>
+          <button class="sample-btn" data-url="https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Gatto_europeo4.jpg/320px-Gatto_europeo4.jpg">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="3"/><path d="m2 10 10 5 10-5"/></svg>
+            <span>Tabby</span>
+          </button>
+        </div>
       </div>
     </section>
+
+    <section id="how-it-works" class="info-section">
+      <div class="section-label">How it works</div>
+      <h2>Neural networks, in your browser</h2>
+      <p class="section-desc">
+        V-Image runs a full convolutional neural network directly in your browser tab using WebGL acceleration.
+        No data ever leaves your device.
+      </p>
+      <div class="steps-grid">
+        <div class="step-card">
+          <div class="step-num">01</div>
+          <h3>Model loads</h3>
+          <p>MobileNet v3 (~16 MB) is fetched from CDN and cached in your browser. On repeat visits it loads in under a second.</p>
+        </div>
+        <div class="step-card">
+          <div class="step-num">02</div>
+          <h3>Image is pre-processed</h3>
+          <p>Your image is resized to 224x224 pixels and normalized into a float tensor. Nothing is sent to any server.</p>
+        </div>
+        <div class="step-card">
+          <div class="step-num">03</div>
+          <h3>Inference runs</h3>
+          <p>TensorFlow.js pushes the tensor through 90+ neural network layers via WebGL GPU acceleration in milliseconds.</p>
+        </div>
+        <div class="step-card">
+          <div class="step-num">04</div>
+          <h3>Top predictions shown</h3>
+          <p>The top 5 classes by confidence are ranked and displayed with percentage scores and animated confidence bars.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="info-section specs-section">
+      <div class="section-label">Under the hood</div>
+      <h2>Technical specifications</h2>
+      <div class="specs-grid">
+        <div class="spec-row"><span class="spec-key">Model</span><span class="spec-val">MobileNet v3 Large (ImageNet)</span></div>
+        <div class="spec-row"><span class="spec-key">Framework</span><span class="spec-val">TensorFlow.js 4.17 + WebGL backend</span></div>
+        <div class="spec-row"><span class="spec-key">Input size</span><span class="spec-val">224 x 224 pixels (auto-resized)</span></div>
+        <div class="spec-row"><span class="spec-key">Output classes</span><span class="spec-val">1,000 ImageNet categories</span></div>
+        <div class="spec-row"><span class="spec-key">Inference time</span><span class="spec-val">50 to 300 ms depending on device GPU</span></div>
+        <div class="spec-row"><span class="spec-key">Model size</span><span class="spec-val">~16 MB (cached after first load)</span></div>
+        <div class="spec-row"><span class="spec-key">Privacy</span><span class="spec-val">Zero data sent to any server</span></div>
+        <div class="spec-row"><span class="spec-key">Supported formats</span><span class="spec-val">PNG, JPG, WEBP, GIF, BMP</span></div>
+        <div class="spec-row"><span class="spec-key">Top-1 accuracy</span><span class="spec-val">~75% on ImageNet benchmark</span></div>
+        <div class="spec-row"><span class="spec-key">Browser support</span><span class="spec-val">Chrome, Firefox, Safari, Edge (modern)</span></div>
+      </div>
+    </section>
+
+    <section id="faq" class="info-section">
+      <div class="section-label">FAQ</div>
+      <h2>Common questions</h2>
+      <div class="faq-list">
+        <details class="faq-item">
+          <summary>Is my image uploaded anywhere?</summary>
+          <p>No. Your image never leaves your device. V-Image loads the neural network model once from a CDN, then all processing happens locally inside your browser tab using JavaScript and WebGL. We have no server that receives image data.</p>
+        </details>
+        <details class="faq-item">
+          <summary>Why does it take a few seconds to start?</summary>
+          <p>The first time you visit, your browser needs to download the MobileNet model (~16 MB) from a CDN. After that it is cached and loads instantly on return visits. The status badge in the top-right corner shows live loading progress.</p>
+        </details>
+        <details class="faq-item">
+          <summary>How accurate is it?</summary>
+          <p>MobileNet v3 achieves around 75% top-1 accuracy on the ImageNet benchmark. It works best on clear, well-lit photos of single objects. Complex scenes or unusual angles will produce lower confidence scores — check the percentages to gauge certainty.</p>
+        </details>
+        <details class="faq-item">
+          <summary>What kinds of objects can it recognise?</summary>
+          <p>The model was trained on ImageNet's 1,000 classes which include animals, vehicles, food, household objects, plants, musical instruments, clothing, and more. It does not recognise faces, text, or document content.</p>
+        </details>
+        <details class="faq-item">
+          <summary>Can I use this on mobile?</summary>
+          <p>Yes. V-Image is fully responsive. On mobile, tap "Browse files" to select from your photo library or camera roll. Inference may be slightly slower on older devices due to limited GPU capability.</p>
+        </details>
+        <details class="faq-item">
+          <summary>Can I deploy or self-host this?</summary>
+          <p>Absolutely. The entire project is plain HTML, CSS, and JavaScript with no build step. Host it on GitHub Pages, Netlify, Vercel, or any static file server in seconds. See the README for full deployment instructions.</p>
+        </details>
+        <details class="faq-item">
+          <summary>Can I swap in a custom model?</summary>
+          <p>Yes. Replace the MobileNet load call in app.js with any TensorFlow.js compatible model. You can export custom classifiers from Google Teachable Machine and drop them straight in with just a path change.</p>
+        </details>
+      </div>
+    </section>
+
   </main>
 
   <footer>
-    <span>Powered by <strong>TensorFlow.js</strong> + <strong>MobileNet v3</strong></span>
-    <span>·</span>
-    <span>All inference runs locally in your browser</span>
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <span class="logo-text" style="font-size:0.95rem;">V-Image</span>
+        <span class="footer-tagline">On-device image classification</span>
+      </div>
+      <div class="footer-links">
+        <span>Built with TensorFlow.js</span>
+        <span class="sep">&middot;</span>
+        <span>MobileNet v3</span>
+        <span class="sep">&middot;</span>
+        <span>No cookies</span>
+        <span class="sep">&middot;</span>
+        <span>No tracking</span>
+      </div>
+    </div>
   </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
