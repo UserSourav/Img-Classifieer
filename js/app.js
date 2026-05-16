@@ -1,4 +1,4 @@
-/* ===== VisionAI — Image Classifier App ===== */
+/* ===== V-Image — App Logic ===== */
 
 const dropZone    = document.getElementById('dropZone');
 const dropInner   = document.getElementById('dropInner');
@@ -6,6 +6,7 @@ const previewState= document.getElementById('previewState');
 const fileInput   = document.getElementById('fileInput');
 const previewImg  = document.getElementById('previewImg');
 const resetBtn    = document.getElementById('resetBtn');
+const tryAnother  = document.getElementById('tryAnother');
 const thinking    = document.getElementById('thinking');
 const results     = document.getElementById('results');
 const predictions = document.getElementById('predictions');
@@ -18,10 +19,10 @@ const sampleGrid  = document.getElementById('sampleGrid');
 let model = null;
 let classifyStart = 0;
 
-/* ─── Load Model ─── */
+/* ── Load Model ── */
 async function loadModel() {
   try {
-    modelStatus.textContent = 'Loading model…';
+    modelStatus.textContent = 'Loading model\u2026';
     model = await mobilenet.load({ version: 2, alpha: 1.0 });
     dot.className = 'dot ready';
     modelBadge.className = 'model-badge ready';
@@ -34,10 +35,9 @@ async function loadModel() {
   }
 }
 
-/* ─── Classify Image ─── */
+/* ── Classify Image ── */
 async function classify(imgEl) {
   if (!model) return;
-
   thinking.classList.remove('hidden');
   results.classList.add('hidden');
   predictions.innerHTML = '';
@@ -50,13 +50,13 @@ async function classify(imgEl) {
     renderResults(preds, elapsed);
   } catch (err) {
     thinking.classList.add('hidden');
-    predictions.innerHTML = `<li style="color:#ff6b6b;font-size:0.8rem;">Classification failed.</li>`;
+    predictions.innerHTML = '<li style="color:#ff6b6b;font-size:0.8rem;">Classification failed. Try a different image.</li>';
     results.classList.remove('hidden');
     console.error('Classification error:', err);
   }
 }
 
-/* ─── Render Results ─── */
+/* ── Render Results ── */
 function renderResults(preds, elapsed) {
   thinking.classList.add('hidden');
   results.classList.remove('hidden');
@@ -83,39 +83,33 @@ function renderResults(preds, elapsed) {
     predictions.appendChild(li);
   });
 
-  // Animate bars after DOM insert
   requestAnimationFrame(() => {
     document.querySelectorAll('.pred-bar').forEach(bar => {
       bar.style.width = bar.dataset.width + '%';
     });
   });
 
-  metaEl.innerHTML = `
-    ⏱ ${elapsed}s inference time<br>
-    📊 ${preds.length} predictions<br>
-    🔒 Processed locally
-  `;
+  metaEl.innerHTML =
+    `Inference: ${elapsed}s&nbsp;&nbsp;|&nbsp;&nbsp;${preds.length} results&nbsp;&nbsp;|&nbsp;&nbsp;Processed locally`;
 }
 
-/* ─── Clean Label ─── */
+/* ── Clean Label ── */
 function cleanLabel(raw) {
-  // MobileNet labels can be comma-separated synonyms; take the first
   const first = raw.split(',')[0].trim();
   return first.charAt(0).toUpperCase() + first.slice(1);
 }
 
-/* ─── Show Preview ─── */
+/* ── Show Preview ── */
 function showPreview(src) {
   previewImg.src = src;
   dropInner.classList.add('hidden');
   previewState.classList.remove('hidden');
   thinking.classList.remove('hidden');
   results.classList.add('hidden');
-
   previewImg.onload = () => classify(previewImg);
 }
 
-/* ─── Reset ─── */
+/* ── Reset ── */
 function reset() {
   previewImg.src = '';
   previewState.classList.add('hidden');
@@ -125,7 +119,7 @@ function reset() {
   metaEl.textContent = '';
 }
 
-/* ─── File Input ─── */
+/* ── File Input ── */
 fileInput.addEventListener('change', (e) => {
   const file = e.target.files[0];
   if (!file) return;
@@ -134,7 +128,7 @@ fileInput.addEventListener('change', (e) => {
   reader.readAsDataURL(file);
 });
 
-/* ─── Drag & Drop ─── */
+/* ── Drag & Drop ── */
 dropZone.addEventListener('dragover', (e) => {
   e.preventDefault();
   dropZone.classList.add('drag-over');
@@ -155,7 +149,7 @@ dropZone.addEventListener('drop', (e) => {
   }
 });
 
-/* ─── Paste from Clipboard ─── */
+/* ── Clipboard Paste ── */
 document.addEventListener('paste', (e) => {
   const items = Array.from(e.clipboardData.items);
   const imageItem = items.find(i => i.type.startsWith('image/'));
@@ -167,11 +161,10 @@ document.addEventListener('paste', (e) => {
   }
 });
 
-/* ─── Sample Buttons ─── */
+/* ── Sample Buttons ── */
 sampleGrid.querySelectorAll('.sample-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     const url = btn.dataset.url;
-    // Load via proxy-safe image
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
@@ -179,19 +172,16 @@ sampleGrid.querySelectorAll('.sample-btn').forEach(btn => {
       canvas.width = img.naturalWidth;
       canvas.height = img.naturalHeight;
       canvas.getContext('2d').drawImage(img, 0, 0);
-      const dataUrl = canvas.toDataURL('image/jpeg');
-      showPreview(dataUrl);
+      showPreview(canvas.toDataURL('image/jpeg'));
     };
-    img.onerror = () => {
-      // Fallback: try direct src
-      showPreview(url);
-    };
+    img.onerror = () => showPreview(url);
     img.src = url;
   });
 });
 
-/* ─── Reset Button ─── */
+/* ── Reset & Try Another Buttons ── */
 resetBtn.addEventListener('click', reset);
+tryAnother.addEventListener('click', reset);
 
-/* ─── Init ─── */
+/* ── Init ── */
 loadModel();
