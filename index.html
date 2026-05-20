@@ -494,7 +494,10 @@
         resultsDiv.classList.add('hidden');
         classify(previewImg);
       };
-      previewImg.onerror = () => alert('Could not load image.');
+      previewImg.onerror = () => {
+  console.error('Could not load image.');
+  reset();
+};
       previewImg.src = src;
     }
 
