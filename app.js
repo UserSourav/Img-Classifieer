@@ -1,8 +1,7 @@
 /**
  * V-Image — app.js
- * Classification flow:
- *   1. Try Google Vision API via /api/classify (Vercel serverless function)
- *   2. If API call fails for any reason, fall back to MobileNet v3 in-browser
+ * Classification using MediaPipe EfficientNet-Lite0
+ * Runs entirely in-browser, no server required.
  */
 
 'use strict';
@@ -14,10 +13,6 @@ const CONFIG = {
   TOP_K: 10,
   DISPLAY_K: 5,
   LOW_CONF_THRESHOLD: 0.40,
-  INPUT_SIZE: 224,
-  PRESAMPLE_SIZE: 256,
-  // Set to false to always use MobileNet (useful for local dev without backend)
-  USE_VISION_API: true,
 };
 
 /* ─────────────────────────────────────────────
@@ -42,8 +37,8 @@ const sampleGrid   = $('sampleGrid');
 /* ─────────────────────────────────────────────
    STATE
 ───────────────────────────────────────────── */
-let mobileNetModel = null;
-let mobilenetReady = false;
+let imageClassifier = null;
+let modelReady      = false;
 
 /* ─────────────────────────────────────────────
    BADGE HELPER
@@ -72,91 +67,67 @@ function prettyLabel(raw) {
 }
 
 /* ─────────────────────────────────────────────
-   MOBILENET — loads in background as fallback
+   LOAD EFFICIENTNET-LITE0  (via MediaPipe)
+   ~25 MB model, ~80% top-1 on ImageNet
+   (vs MobileNet v3 ~75%)
 ───────────────────────────────────────────── */
-async function loadMobileNet() {
-  if (!window.mobilenet) return;
+async function loadEfficientNet() {
   try {
-    setBadge('loading', 'Loading fallback model…');
-    mobileNetModel = await mobilenet.load({ version: 2, alpha: 1.0 });
-    mobilenetReady = true;
-    setBadge('ready', 'Ready');
-    console.log('[V-Image] MobileNet fallback ready');
+    setBadge('loading', 'Loading EfficientNet…');
+
+    const { ImageClassifier, FilesetResolver } = await import(
+      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/vision_bundle.mjs'
+    );
+
+    const vision = await FilesetResolver.forVisionTasks(
+      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm'
+    );
+
+    imageClassifier = await ImageClassifier.createFromOptions(vision, {
+      baseOptions: {
+        modelAssetPath:
+          'https://storage.googleapis.com/mediapipe-models/image_classifier/efficientnet_lite0/float32/1/efficientnet_lite0.tflite',
+        delegate: 'GPU',
+      },
+      maxResults: CONFIG.TOP_K,
+      scoreThreshold: 0.0,
+    });
+
+    modelReady = true;
+    setBadge('ready', 'EfficientNet ready');
+    console.log('[V-Image] EfficientNet-Lite0 loaded');
   } catch (err) {
-    console.warn('[V-Image] MobileNet failed to load:', err.message);
+    console.error('[V-Image] EfficientNet failed to load:', err);
     setBadge('error', 'Model error');
   }
 }
 
 /* ─────────────────────────────────────────────
-   IMAGE → BASE64
-   Draws the image onto a canvas and extracts
-   a base64 JPEG string to send to the API.
+   CLASSIFY WITH EFFICIENTNET
 ───────────────────────────────────────────── */
-function imageToBase64(imgEl) {
-  const canvas = document.createElement('canvas');
-
-  // Cap at 1024px to keep payload size reasonable
-  const MAX = 1024;
-  let w = imgEl.naturalWidth  || imgEl.width;
-  let h = imgEl.naturalHeight || imgEl.height;
-  if (w > MAX || h > MAX) {
-    const scale = MAX / Math.max(w, h);
-    w = Math.round(w * scale);
-    h = Math.round(h * scale);
+async function classifyWithEfficientNet(imgEl) {
+  if (!modelReady || !imageClassifier) {
+    throw new Error('EfficientNet not ready');
   }
 
-  canvas.width  = w;
-  canvas.height = h;
-  canvas.getContext('2d').drawImage(imgEl, 0, 0, w, h);
-
-  // Returns base64 string WITHOUT the "data:image/jpeg;base64," prefix
-  return canvas.toDataURL('image/jpeg', 0.88).split(',')[1];
-}
-
-/* ─────────────────────────────────────────────
-   GOOGLE VISION API  (via Vercel serverless)
-───────────────────────────────────────────── */
-async function classifyWithVisionAPI(imgEl) {
-  const imageBase64 = imageToBase64(imgEl);
-
-  const res = await fetch('/api/classify', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ imageBase64 }),
-  });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `HTTP ${res.status}`);
-  }
-
-  return await res.json();
-}
-
-/* ─────────────────────────────────────────────
-   MOBILENET INFERENCE  (fallback)
-───────────────────────────────────────────── */
-async function classifyWithMobileNet(imgEl) {
-  if (!mobilenetReady || !mobileNetModel) {
-    throw new Error('MobileNet not ready');
-  }
   const t0 = performance.now();
-  const preds = await mobileNetModel.classify(imgEl, CONFIG.TOP_K);
+  const result = imageClassifier.classify(imgEl);
   const elapsed = performance.now() - t0;
+
+  const classifications = result?.classifications?.[0]?.categories || [];
+
   return {
-    source: 'mobilenet',
+    source: 'efficientnet-lite0',
     elapsed,
-    labels: preds.map(p => ({
-      label: prettyLabel(p.className),
-      confidence: parseFloat((p.probability * 100).toFixed(1)),
+    labels: classifications.map(c => ({
+      label: prettyLabel(c.categoryName),
+      confidence: parseFloat((c.score * 100).toFixed(1)),
     })),
-    objects: [],
   };
 }
 
 /* ─────────────────────────────────────────────
-   MAIN CLASSIFY — tries Vision API, falls back
+   MAIN CLASSIFY
 ───────────────────────────────────────────── */
 async function runClassify(imgEl) {
   setThinking('Analyzing image…');
@@ -165,26 +136,11 @@ async function runClassify(imgEl) {
 
   let result = null;
 
-  if (CONFIG.USE_VISION_API) {
-    try {
-      const t0 = performance.now();
-      result = await classifyWithVisionAPI(imgEl);
-      result.elapsed = performance.now() - t0;
-      console.log('[V-Image] Google Vision result:', result);
-    } catch (err) {
-      console.warn('[V-Image] Vision API failed, falling back to MobileNet:', err.message);
-      setBadge('ready', 'API failed — using MobileNet');
-    }
-  }
-
-  // Fallback to MobileNet if Vision API failed or is disabled
-  if (!result) {
-    try {
-      result = await classifyWithMobileNet(imgEl);
-    } catch (err) {
-      thinking.innerHTML = `<span style="color:#ff6b6b">Error: ${err.message}</span>`;
-      return;
-    }
+  try {
+    result = await classifyWithEfficientNet(imgEl);
+  } catch (err) {
+    thinking.innerHTML = `<span style="color:#ff6b6b">Error: ${err.message}</span>`;
+    return;
   }
 
   showResults(result);
@@ -196,32 +152,13 @@ async function runClassify(imgEl) {
 function showResults(result) {
   predList.innerHTML = '';
 
-  const isVision    = result.source === 'google-vision';
-  const isMobileNet = result.source === 'mobilenet';
-
-  // Google Vision: prefer objects (more specific) over labels
-  let items = [];
-  if (isVision) {
-    // Merge objects + labels, deduplicate by lowercase label
-    const seen = new Set();
-    const merged = [...(result.objects || []), ...(result.labels || [])];
-    for (const item of merged) {
-      const key = item.label.toLowerCase();
-      if (!seen.has(key)) {
-        seen.add(key);
-        items.push(item);
-      }
-    }
-    items = items.slice(0, CONFIG.DISPLAY_K);
-  } else {
-    items = (result.labels || []).slice(0, CONFIG.DISPLAY_K);
-  }
+  const items = (result.labels || []).slice(0, CONFIG.DISPLAY_K);
 
   if (items.length === 0) {
     predList.innerHTML = '<li style="color:var(--muted);font-size:0.78rem">No results returned.</li>';
   }
 
-  const topConf = items[0]?.confidence || 0;
+  const topConf  = items[0]?.confidence || 0;
   const isLowConf = topConf < (CONFIG.LOW_CONF_THRESHOLD * 100);
 
   items.forEach((item, i) => {
@@ -247,9 +184,8 @@ function showResults(result) {
     });
   });
 
-  // Low confidence warning (MobileNet only)
   let warningHTML = '';
-  if (isMobileNet && isLowConf) {
+  if (isLowConf) {
     warningHTML = `
       <div class="low-conf-warning">
         Low confidence (${topConf.toFixed(0)}%) —
@@ -257,19 +193,18 @@ function showResults(result) {
       </div>`;
   }
 
-  const sourceLabel = isVision ? 'Google Vision API' : 'MobileNet v3 (fallback)';
   const elapsedText = result.elapsed ? `${Math.round(result.elapsed)} ms` : '—';
 
   metaDiv.innerHTML = `
     ${warningHTML}
-    <span>Model: ${sourceLabel}</span><br>
+    <span>Model: EfficientNet-Lite0</span><br>
     <span>Inference: ${elapsedText}</span><br>
     ${topConf ? `<span>Top confidence: ${topConf.toFixed(1)}%</span>` : ''}
   `;
 
   thinking.classList.add('hidden');
   resultsDiv.classList.remove('hidden');
-  setBadge('ready', isVision ? 'Google Vision ready' : 'Ready');
+  setBadge('ready', 'EfficientNet ready');
 }
 
 /* ─────────────────────────────────────────────
@@ -367,4 +302,4 @@ if (sampleGrid) {
    BOOT
 ───────────────────────────────────────────── */
 setBadge('loading', 'Loading…');
-loadMobileNet();
+loadEfficientNet();
