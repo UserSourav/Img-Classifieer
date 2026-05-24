@@ -1,103 +1,157 @@
-# V-Image — Browser Image Classifier
+# V-Image — Browser-Native Image Classifier
 
-A browser-based image classifier that identifies objects in photos using a neural network. No server, no uploads, no account required. Everything runs locally inside the user's browser tab.
-
-Live demo: https://vimgcls.vercel.app
+> Classify any image instantly using EfficientNet-Lite0 — runs entirely in your browser, no uploads, fully private.
 
 ---
 
-## How it works
+## Overview
 
-When the page loads, the browser downloads the MobileNet v3 model (~16 MB) from jsDelivr's CDN and caches it locally. On repeat visits the model loads from cache instantly with no re-download.
+V-Image is a client-side image classification web app that runs a state-of-the-art neural network directly in the browser using WebAssembly and GPU acceleration. No image data ever leaves your device.
 
-When a user drops or selects an image, TensorFlow.js resizes it to 224x224 pixels, converts it to a numeric tensor, and runs it through the neural network using the device's GPU via WebGL. The model outputs probability scores across 1,000 ImageNet categories. The top 5 results are displayed with confidence percentages. The image never leaves the device.
+Drop an image, paste from clipboard, or pick a sample — and get top-5 predictions with confidence scores in under 300ms.
 
 ---
 
 ## Features
 
-- Drag and drop, file picker, or clipboard paste (Ctrl+V) to load images
-- Classifies across 1,000 object categories trained on ImageNet
-- Inference runs in 50 to 300 ms depending on device GPU
-- Six built-in sample images to try immediately
-- Fully responsive, works on mobile browsers
-- Zero data sent to any server at any point
+- **100% on-device inference** — no server, no uploads, no account
+- **EfficientNet-Lite0** — ~80% top-1 accuracy on 1,000 ImageNet categories
+- **Fast** — 50–300ms inference time depending on device GPU
+- **Privacy-first** — zero data sent anywhere
+- **Drag & drop, file browse, clipboard paste, or sample images**
+- **Animated confidence bars** with low-confidence warnings
+- **Responsive** — works on desktop and mobile
+- **No cookies, no tracking**
 
 ---
 
-## Tech stack
+## Demo
 
-| Component | Technology |
+| Feature | Detail |
 |---|---|
-| Neural network engine | TensorFlow.js 4.17 |
-| Classification model | MobileNet v3 Large |
-| Model hosting | jsDelivr CDN |
-| Frontend | Vanilla HTML, CSS, JavaScript |
-| Deployment | Vercel |
+| Model | EfficientNet-Lite0 (ImageNet) |
+| Output classes | 1,000 categories |
+| Model size | ~25 MB (cached after first load) |
+| Inference time | 50–300 ms |
+| Top-1 accuracy | ~80% on ImageNet benchmark |
+| Framework | MediaPipe Tasks Vision + WebAssembly |
+| Supported formats | PNG, JPG, WEBP, GIF, BMP |
+| Browser support | Chrome, Firefox, Safari, Edge (modern) |
 
 ---
 
-## Model details
+## How It Works
 
-- Architecture: MobileNet v3 Large
-- Training dataset: ImageNet (1,000 classes)
-- Input size: 224 x 224 pixels (images are auto-resized)
-- Top-1 accuracy: approximately 75% on ImageNet benchmark
-- Model size: approximately 16 MB
-- License: Apache 2.0 (Google)
-
-The model works best on clear, well-lit photos of a single object centered in the frame. Complex scenes, unusual angles, or objects outside the 1,000 ImageNet categories will produce lower confidence scores.
+1. **Model loads** — EfficientNet-Lite0 is fetched from Google's CDN and cached in your browser. Subsequent visits load instantly.
+2. **Image is pre-processed** — resized and normalized locally for model input.
+3. **Inference runs** — MediaPipe runs the model via WebAssembly with GPU delegate acceleration.
+4. **Results shown** — top 5 predicted classes are ranked and displayed with animated confidence bars.
 
 ---
 
-## Project structure
+## Getting Started
 
-```
-Img-Classifieer/
-├── index.html      Main page, UI layout, styles, background canvas animation
-├── app.js          Model loading, image preprocessing, inference, result rendering
-└── style.css       Additional styles
-```
+V-Image is a single HTML file with no build step required.
 
----
-
-## Running locally
-
-No build step or package installation required. Open `index.html` directly in a browser, or serve it with any static file server.
+### Run locally
 
 ```bash
-# Using Python
-python -m http.server 8080
+# Clone the repo
+git clone https://github.com/Usersourav/v-image.git
+cd v-image
 
-# Using Node.js
+# Serve with any static file server, e.g.:
 npx serve .
+# or
+python3 -m http.server 8080
 ```
 
 Then open `http://localhost:8080` in your browser.
 
----
+> **Note:** The app must be served over HTTP/HTTPS (not opened as a `file://` URL) for WebAssembly and cross-origin model loading to work correctly.
 
-## Accuracy notes
+### No dependencies to install
 
-MobileNet v3 is a lightweight model designed for speed on mobile devices. Its 75% top-1 accuracy is a hard ceiling for this architecture. For higher accuracy the options are:
-
-- Switch to EfficientNet-Lite4 (~87% top-1, still browser-runnable)
-- Use a server-side model via an external vision API
-
-The current `app.js` in this repository includes an improved version that attempts to load EfficientNet-Lite4 first and falls back to MobileNet v3 if it fails, along with better image preprocessing and a label prettifier.
+All runtime dependencies (MediaPipe, EfficientNet model) are loaded from CDN on first use. The model (~25 MB) is cached by your browser automatically.
 
 ---
 
-## Privacy
+## Usage
 
-The MobileNet model file is downloaded once from jsDelivr's CDN servers on first visit and cached by the browser. After that, no external requests are made during classification. No image data, usage data, or analytics are collected or transmitted.
+| Method | How |
+|---|---|
+| Drag & drop | Drop any image onto the drop zone |
+| File browser | Click **Browse files** |
+| Clipboard | Press `Ctrl+V` / `Cmd+V` to paste a copied image |
+| Sample images | Click any sample button (Dog, Cat, Elephant, etc.) |
+
+After classification, results show the top 5 predicted categories with confidence percentages. A warning is shown when top confidence is below 40%.
 
 ---
 
-## Credits
+## Tech Stack
 
-- MobileNet v3 model by Google, licensed under Apache 2.0
-- TensorFlow.js by Google, licensed under Apache 2.0
-- Built by Sourav — ss6015@srmist.edu.in
-- LinkedIn: linkedin.com/in/usersourav
-- GitHub: github.com/Usersourav
+| Layer | Technology |
+|---|---|
+| ML model | EfficientNet-Lite0 (TFLite, float32) |
+| Inference runtime | [MediaPipe Tasks Vision](https://developers.google.com/mediapipe) |
+| Acceleration | WebAssembly + GPU delegate |
+| Model source | [Google MediaPipe Models CDN](https://storage.googleapis.com/mediapipe-models/) |
+| Fonts | Syne, DM Mono (Google Fonts) |
+| Background FX | Custom canvas animation (vanilla JS) |
+
+---
+
+## Project Structure
+
+```
+v-image/
+└── index.html     # Entire app — markup, styles, canvas animation, and ML logic
+```
+
+---
+
+## Limitations
+
+- Works best on **clear, well-lit photos of single objects**
+- Does **not** recognise faces, text, or document content
+- Trained on ImageNet's 1,000 classes — objects outside this set will produce low-confidence results
+- Older mobile devices may experience slower inference times
+
+---
+
+## FAQ
+
+**Is my image uploaded anywhere?**
+No. All processing happens locally in your browser tab. No image data is ever sent to a server.
+
+**Why does it take a few seconds the first time?**
+The browser downloads EfficientNet-Lite0 (~25 MB) from Google's CDN on the first visit. After that, it's cached and loads in under a second.
+
+**Can I use this on mobile?**
+Yes. Tap **Browse files** to select from your photo library or camera roll. Inference may be slightly slower on older devices.
+
+---
+
+## Author
+
+**Sourav**
+- Email: [ss6015@srmist.edu.in](mailto:ss6015@srmist.edu.in)
+- LinkedIn: [linkedin.com/in/usersourav](https://linkedin.com/in/usersourav)
+- GitHub: [github.com/Usersourav](https://github.com/Usersourav)
+
+---
+
+## License
+
+This project is open source. Feel free to fork, modify, and build on it.
+
+### Third-party attributions
+
+| Component | License |
+|---|---|
+| **EfficientNet-Lite0** — Google LLC | [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0) |
+| **MediaPipe Tasks Vision** — Google LLC | [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0) |
+| **Syne & DM Mono fonts** — Google Fonts | [OFL 1.1](https://scripts.sil.org/OFL) |
+
+EfficientNet-Lite0 is a neural network architecture developed by Google and trained on the [ImageNet](https://www.image-net.org/) dataset. The model weights are distributed by Google under the Apache 2.0 license via the [MediaPipe Models CDN](https://storage.googleapis.com/mediapipe-models/). Use of the model is subject to that license.
