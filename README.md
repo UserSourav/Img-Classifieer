@@ -106,7 +106,9 @@ After classification, results show the top 5 predicted categories with confidenc
 
 ```
 v-image/
-└── index.html     # Entire app — markup, styles, canvas animation, and ML logic
+├── index.html     # Markup and canvas background animation
+├── app.js         # ML logic — EfficientNet-Lite0 classification via MediaPipe
+└── style.css      # Styles and responsive layout
 ```
 
 ---
